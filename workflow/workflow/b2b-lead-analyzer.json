@@ -1,0 +1,797 @@
+{
+  "name": "B2B Lead Signal Analyzer",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -128,
+        48
+      ],
+      "id": "f77d9c42-7424-4ee0-84bd-268585925cc3",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        80,
+        48
+      ],
+      "id": "d9caa102-64f0-4915-b2f6-f89f0967e6af",
+      "name": "When chat message received",
+      "webhookId": "468aaab6-82ec-4eb8-83ed-7c9fbb4ba601"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "builtInTools": {
+          "webSearch": {
+            "searchContextSize": "medium"
+          }
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        160,
+        256
+      ],
+      "id": "1312c7be-f661-4ead-9c79-d9ea6aeabd26",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "TidsRrv2fqQa3Bkz",
+          "name": "OpenAi account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Search the real-time internet using Tavily. \nInput is a text query. Output is Tavily JSON search results.\nUse this tool whenever the user asks for information about companies, news, signals, or recent events.\n",
+        "method": "POST",
+        "url": "https://api.tavily.com/search",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "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"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "query",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters0_Value', ``, 'string') }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.3,
+      "position": [
+        448,
+        256
+      ],
+      "id": "a611d0b2-71dd-4f58-bac9-26438a69c961",
+      "name": "tavilySearch"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract the JSON array of companies from Agent 1's response\n// So Agent 2 can loop through each company\n// Extract companies from Agent 1's output\nconst agentOutput = $input.all()[0].json.output;\n\n// Parse the JSON if it's a string, or use it directly if it's already an object\nlet companies;\ntry {\n  // Try to find JSON array in the text\n  const jsonMatch = agentOutput.match(/\\[[\\s\\S]*\\]/);\n  if (jsonMatch) {\n    companies = JSON.parse(jsonMatch[0]);\n  } else {\n    companies = [];\n  }\n} catch (error) {\n  console.log(\"Error parsing companies:\", error);\n  companies = [];\n}\n\n// Return each company as a separate item so we can loop through them\nreturn companies.map(company => ({\n  json: {\n    company_name: company.company,\n    signals: company.signals_detected,\n    summary: company.summary,\n    sources: company.sources\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        48
+      ],
+      "id": "9a581009-b735-42d3-8d24-8efc83b08b13",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.firecrawl.dev/v0/scrape",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "url",
+              "value": "={{ $json.sources[0] }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        848,
+        48
+      ],
+      "id": "9ba42b0e-638d-4b3e-a2e7-1098da9bdf96",
+      "name": "HTTP Request",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "vrHV0riwGWPsSJTU",
+          "name": "Bearer Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        928,
+        256
+      ],
+      "id": "915e875c-7219-49eb-83ac-00ba09cbaf9e",
+      "name": "OpenAI Chat Model1",
+      "credentials": {
+        "openAiApi": {
+          "id": "TidsRrv2fqQa3Bkz",
+          "name": "OpenAi account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Analyze this company article and extract B2B buying signals: {{ $json.data.content }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are a B2B Signal Analysis Agent specializing in extracting buying intent signals from company news and articles.\n\nYour task: Analyze the scraped article content and extract detailed signals about the company's expansion into Asia-Pacific.\n\nARTICLE CONTENT TO ANALYZE:\n{{ $json.data.content }}\n\nExtract and structure the following information:\n\n1. FUNDING SIGNALS:\n   - Funding round (Series A/B/C, amount)\n   - Investors involved\n   - Stated use of funds\n   - Timeline/dates\n\n2. GEOGRAPHIC EXPANSION SIGNALS:\n   - New offices/locations in Asia\n   - Market entry plans\n   - Regional partnerships\n   - Data center/infrastructure builds\n\n3. HIRING SIGNALS:\n   - Job postings mentioned\n   - Team expansion (how many hires)\n   - Key executive hires in Asia\n   - Departments hiring\n\n4. TECHNOLOGY SIGNALS:\n   - Product launches in APAC\n   - Tech stack mentions\n   - Platform capabilities\n   - Integration partners\n\n5. URGENCY INDICATORS:\n   - Timeline mentioned (Q1 2025, etc.)\n   - Competitive pressure\n   - Market opportunity size\n   - Executive quotes about urgency\n\nReturn ONLY a JSON object with this structure:\n{\n  \"company_name\": \"extracted from content\",\n  \"funding_signals\": {\n    \"round\": \"\",\n    \"amount\": \"\",\n    \"investors\": [],\n    \"use_of_funds\": \"\",\n    \"date\": \"\"\n  },\n  \"expansion_signals\": {\n    \"locations\": [],\n    \"markets\": [],\n    \"partnerships\": [],\n    \"infrastructure\": []\n  },\n  \"hiring_signals\": {\n    \"total_hires\": \"\",\n    \"roles\": [],\n    \"executives\": [],\n    \"departments\": []\n  },\n  \"tech_signals\": {\n    \"products\": [],\n    \"tech_stack\": [],\n    \"integrations\": []\n  },\n  \"urgency_score\": \"1-10\",\n  \"key_quotes\": [],\n  \"analysis_summary\": \"2-3 sentences\"\n}\n\nBe thorough but only include information explicitly stated in the article. If information is not available, use empty strings or empty arrays.",
+          "maxIterations": 20
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        1056,
+        48
+      ],
+      "id": "5eded4de-3cfe-4d65-bf9a-a0c2deee40ff",
+      "name": "Signal Extractor"
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are an expert B2B lead research agent. Your ONLY job is to find EXACTLY 8 SaaS companies expanding into Asia-Pacific in 2025.\n\nSTRICT RULES:\n1. You MUST return EXACTLY 8 companies in your response\n2. Do NOT ask if the user wants more - just keep searching until you have 8\n3. Do NOT stop at 2, 3, or 5 companies - continue searching until you reach 8\n4. Use web search tool 6-8 times with DIFFERENT queries to find enough companies\n\nSEARCH STRATEGY - Use these queries one by one:\nQuery 1: \"SaaS companies expanding Asia Pacific 2025\"\nQuery 2: \"Series B funding SaaS companies Asia 2025\"\nQuery 3: \"SaaS startups hiring Asia Pacific\"\nQuery 4: \"enterprise software companies opening offices Asia 2025\"\nQuery 5: \"B2B SaaS partnerships Asia 2025\"\nQuery 6: \"cloud software expansion APAC 2025\"\nQuery 7: \"SaaS companies data centers Asia 2025\"\nQuery 8: \"tech companies regional expansion Asia\"\n\nFor EACH company found, extract:\n- Company name\n- Signal type (funding/expansion/hiring/partnership)\n- Specific details with dates\n- Source URLs\n\nOUTPUT FORMAT - Return ONLY this JSON array with 8 companies:\n[\n  {\n    \"company\": \"Company1\",\n    \"signals_detected\": [{\"type\": \"funding\", \"detail\": \"Series B $50M\", \"date\": \"Nov 2025\"}],\n    \"summary\": \"One sentence summary\",\n    \"sources\": [\"https://url.com\"]\n  },\n  {\n    \"company\": \"Company2\",\n    ...\n  },\n  ... (continue until 8 companies)\n]\n\nCRITICAL: Your response must contain EXACTLY 8 companies. Do not stop searching until you have 8. Do not ask permission to continue. Just keep searching and return all 8 in one response.",
+          "maxIterations": 40
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        288,
+        48
+      ],
+      "id": "9f33ac85-58c7-4b36-b97d-dd2c2f12b769",
+      "name": "Search Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        1696,
+        256
+      ],
+      "id": "e55d212d-aa01-4e3e-808e-473d26ec9353",
+      "name": "OpenAI Chat Model2",
+      "credentials": {
+        "openAiApi": {
+          "id": "TidsRrv2fqQa3Bkz",
+          "name": "OpenAi account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Score and rank this company based on their B2B buying signals AND key stakeholders:\n\nBUYING SIGNALS:\n{{ $(\"Signal Extractor\").item.json.output }}\n\nKEY STAKEHOLDERS & PERSONAS:\n{{ $json }}\n\nProvide a comprehensive score that factors in:\n1. Signal strength (funding, expansion, hiring, tech)\n2. Stakeholder accessibility (identified decision-makers)\n3. Recommended entry point (which persona to contact first)\n\n⚠️ CRITICAL: Return ONLY the JSON object. No explanations. No preamble. No markdown fences. Start with { and end with }. Nothing else.",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are a B2B Lead Scoring & Prioritization Agent. Your task is to analyze extracted company signals, stakeholder information, and assign a comprehensive score.\n\nINPUT DATA:\nYou will receive TWO JSON objects:\n1. BUYING SIGNALS: funding_signals, expansion_signals, hiring_signals, tech_signals, urgency_score, and key_quotes\n2. STAKEHOLDER DATA: key_stakeholders, org_insights, and recommended_entry_point\n\nSCORING METHODOLOGY:\n\n1. FUNDING SCORE (0-25 points):\n   - Active funding round: +15 points\n   - Recent funding (within 6 months): +10 points\n   - Large funding amount (>$10M): +5 points\n   - Strategic use of funds for expansion: +5 points\n\n2. EXPANSION SCORE (0-30 points):\n   - Multiple APAC locations: +10 points\n   - New office/data center: +10 points\n   - Regional partnerships: +5 points\n   - Explicit market entry plans: +5 points\n\n3. HIRING SCORE (0-20 points):\n   - Executive hires in Asia: +10 points\n   - Large hiring drive (10+ roles): +5 points\n   - Sales/GTM roles: +3 points\n   - Technical roles: +2 points\n\n4. TECHNOLOGY SCORE (0-15 points):\n   - Product launch in APAC: +8 points\n   - Modern tech stack: +4 points\n   - Integration partnerships: +3 points\n\n5. URGENCY SCORE (0-10 points):\n   - Use the urgency_score from input (1-10 scale)\n\n6. STAKEHOLDER ACCESSIBILITY SCORE (0-10 points):\n   - Key decision-makers identified with names: +5 points\n   - Multiple relevant contacts found: +3 points\n   - Clear entry point recommended: +2 points\n\nTOTAL SCORE: 0-110 (normalize to 0-100 in output)\n\nPRIORITY CLASSIFICATION:\n- 80-100: HOT LEAD (Immediate action)\n- 60-79: WARM LEAD (Contact within 1 week)\n- 40-59: MEDIUM LEAD (Monitor and nurture)\n- 0-39: COLD LEAD (Low priority)\n\nReturn ONLY a JSON object with this EXACT structure:\n{\n  \"company_name\": \"company name here\",\n  \"total_score\": 0,\n  \"priority_level\": \"HOT|WARM|MEDIUM|COLD\",\n  \"score_breakdown\": {\n    \"funding_score\": 0,\n    \"expansion_score\": 0,\n    \"hiring_score\": 0,\n    \"technology_score\": 0,\n    \"urgency_score\": 0,\n    \"stakeholder_score\": 0\n  },\n  \"key_strengths\": [\"strength 1\", \"strength 2\"],\n  \"key_stakeholders\": [\"Name - Title\", \"Name - Title\"],\n  \"recommended_contact\": \"Name and title\",\n  \"recommended_action\": \"Specific next step\",\n  \"contact_timeline\": \"Immediate|1 week|2-4 weeks|Monitor\",\n  \"talking_points\": [\"point 1\", \"point 2\", \"point 3\"]\n}\n\nCRITICAL: Use ONLY these exact field names. Do not use \"breakdown\", \"scores\", \"priority_classification\" or any variations. Use the field names shown above exactly.\n\nFORMATTING: Arrays must contain clean strings without leading newlines or escape characters. Example: [\"strength 1\", \"strength 2\"] NOT [\"\\n \\\"strength 1\\\"\", \"\\n \\\"strength 2\\\"\"]",
+          "maxIterations": 10
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        1824,
+        48
+      ],
+      "id": "ef76a35a-b013-4fdc-b340-862fbe447079",
+      "name": "Scorer"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1Z04Vss0ldjLoFfdzt8hqOV-deQTybLEWB6yviRJJB_M",
+          "mode": "list",
+          "cachedResultName": "B2B Buying Intent Signal Analyzer - Hackathon",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Z04Vss0ldjLoFfdzt8hqOV-deQTybLEWB6yviRJJB_M/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Z04Vss0ldjLoFfdzt8hqOV-deQTybLEWB6yviRJJB_M/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "company_name": "={{$json.company_name}}",
+            "total_score": "={{$json.total_score}}",
+            "priority_level": "={{$json.priority_level}}",
+            "contact_timeline": "={{$json.contact_timeline}}",
+            "recommended_action": "={{$json.recommended_action}}",
+            "hiring_score": "={{ $json.hiring_score }}",
+            "talking_points": "={{ JSON.stringify($json.talking_points) }}",
+            "key_strengths": "={{ JSON.stringify($json.key_strengths) }}",
+            "expansion_score": "={{$json.expansion_score}}",
+            "technology_score": "={{ $json.technology_score }}",
+            "urgency_score": "={{ $json.urgency_score }}",
+            "key_stakeholders": "={{ $json.key_stakeholders }}",
+            "recommended_contact": "={{ $json.recommended_contact }}",
+            "stakeholder_score": "={{ $json.stakeholder_score }}"
+          },
+          "matchingColumns": [
+            "company_name"
+          ],
+          "schema": [
+            {
+              "id": "company_name",
+              "displayName": "company_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "total_score",
+              "displayName": "total_score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "priority_level",
+              "displayName": "priority_level",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "contact_timeline",
+              "displayName": "contact_timeline",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "recommended_action",
+              "displayName": "recommended_action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "key_strengths",
+              "displayName": "key_strengths",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "expansion_score",
+              "displayName": "expansion_score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "hiring_score",
+              "displayName": "hiring_score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "technology_score",
+              "displayName": "technology_score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "urgency_score",
+              "displayName": "urgency_score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "talking_points",
+              "displayName": "talking_points",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "key_stakeholders",
+              "displayName": "key_stakeholders",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "recommended_contact",
+              "displayName": "recommended_contact",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "stakeholder_score",
+              "displayName": "stakeholder_score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2368,
+        48
+      ],
+      "id": "01e8e79a-8dff-4ce1-9273-da9558926a85",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GPOojYFxgYmJjLY9",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Get the output from Scorer\nconst scorerOutput = $input.item.json.output;\n\n// Remove markdown code fences\nlet cleanOutput = scorerOutput\n  .replace(/```json\\n?/g, '')\n  .replace(/```\\n?/g, '')\n  .trim();\n\n// Parse JSON\nlet parsed;\ntry {\n  parsed = JSON.parse(cleanOutput);\n} catch (e) {\n  const match = cleanOutput.match(/\\{[\\s\\S]*?\\}(?=\\{|$)/);\n  if (!match) throw new Error('No JSON found');\n  parsed = JSON.parse(match[0]);\n}\n\n// Extract company name\nconst companyName = parsed.company_name || 'Unknown';\n\n// Get scores from ANY possible location\nconst scoresObj = parsed.score_breakdown || \n                  parsed.scores || \n                  parsed.breakdown || \n                  parsed.score_components || \n                  parsed.scores_breakdown || \n                  {};\n\n// Extract individual scores with ALL possible field name variations\nconst funding = scoresObj.funding_score || parsed.funding_score || 0;\nconst expansion = scoresObj.expansion_score || parsed.expansion_score || 0;\nconst hiring = scoresObj.hiring_score || parsed.hiring_score || 0;\nconst technology = scoresObj.technology_score || parsed.technology_score || 0;\nconst urgency = scoresObj.urgency_score || parsed.urgency_score || 0;\nconst stakeholder = scoresObj.stakeholder_score || \n                    scoresObj.stakeholder_accessibility_score || \n                    parsed.stakeholder_accessibility_score || 0;\n\n// Calculate total score from ALL possible sources\nconst totalScore = parsed.total_score || \n                   parsed.total_raw_score || \n                   parsed.total_normalized_score || \n                   parsed.normalized_score ||\n                   scoresObj.total_score ||\n                   scoresObj.total_score_raw ||\n                   (funding + expansion + hiring + technology + urgency + stakeholder);\n\n// Get priority from ANY possible field name\nconst priority = parsed.priority_level || \n                 parsed.priority_classification || \n                 parsed.priority || \n                 parsed.final_priority ||\n                 (totalScore >= 80 ? 'HOT' : totalScore >= 60 ? 'WARM' : totalScore >= 40 ? 'MEDIUM' : 'COLD');\n\n// Get contact info\nconst recommendedContact = parsed.recommended_contact || \n                           parsed.recommended_entry_point || \n                           'To be identified';\n\n// Get timeline\nconst timeline = parsed.contact_timeline || \n                 (priority === 'HOT' ? 'Immediate' : \n                  priority === 'WARM' ? '1 week' : \n                  '2-4 weeks');\n\n// Clean array function to remove \\n and extra formatting\nconst cleanArray = (arr) => {\n  if (!Array.isArray(arr)) return arr || '';\n  return arr\n    .map(item => {\n      // Convert to string and clean up escape characters\n      let cleaned = String(item)\n        .replace(/^\\\\n\\s*/g, '')  // Remove leading \\n\n        .replace(/\\\\n/g, ' ')      // Replace \\n with space\n        .replace(/^[\"']+|[\"']+$/g, '') // Remove quotes\n        .trim();\n      return cleaned;\n    })\n    .filter(item => item.length > 0)\n    .join('; ');\n};\n\n// Flatten for Google Sheets\nconst flattened = {\n  company_name: companyName,\n  total_score: Math.round(totalScore),\n  priority_level: priority,\n  contact_timeline: timeline,\n  recommended_action: parsed.recommended_action || 'Review opportunity',\n  recommended_contact: recommendedContact,\n  key_strengths: cleanArray(parsed.key_strengths),\n  talking_points: cleanArray(parsed.talking_points),\n  key_stakeholders: cleanArray(parsed.key_stakeholders),\n  funding_score: funding,\n  expansion_score: expansion,\n  hiring_score: hiring,\n  technology_score: technology,\n  urgency_score: urgency,\n  stakeholder_score: stakeholder\n};\n\nreturn { json: flattened };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2176,
+        48
+      ],
+      "id": "297e86af-dd5a-4371-9dbc-6c696a366c37",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $(\"HTTP Request\").item.json.data.content }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are an expert B2B stakeholder analyst. Your task is to identify key decision-makers and stakeholders from company content.\n\nAnalyze the provided content and extract:\n1. Key decision-makers (CEO, CTO, VP level)\n2. Department heads relevant to our solution\n3. Team size and structure (if mentioned)\n4. Hiring signals (open roles indicate decision-makers)\n\nReturn a JSON object with this structure:\n{\n  \"key_stakeholders\": [\n    {\n      \"name\": \"Person Name (if found)\",\n      \"title\": \"Job Title\",\n      \"department\": \"Department\",\n      \"relevance\": \"Why they matter for our outreach\"\n    }\n  ],\n  \"org_insights\": \"Brief summary of organizational structure\",\n  \"recommended_entry_point\": \"Which persona to contact first and why\"\n}\n\nIf no specific names are found, identify the ROLES/titles that should be targeted."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        1408,
+        48
+      ],
+      "id": "b1a01b1b-2e10-48f3-8455-b43670aa9e38",
+      "name": "PERSONA MAPPER"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        1424,
+        192
+      ],
+      "id": "6feba55e-b71d-435c-be37-f0e809913071",
+      "name": "OpenAI Chat Model3",
+      "credentials": {
+        "openAiApi": {
+          "id": "TidsRrv2fqQa3Bkz",
+          "name": "OpenAi account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Generate a comprehensive executive report for these analyzed companies:\n\n{{ JSON.stringify($input.all()) }}\n\nCreate a professional, actionable report that a sales leader can use immediately.",
+        "options": {
+          "systemMessage": "You are an Executive Report Generator for B2B Sales Intelligence. Your task is to analyze scored lead data and create a comprehensive strategic report.\n\nINPUT: You will receive an array of scored companies with:\n- Company names, scores, priority levels\n- Buying signals (funding, expansion, hiring, tech)\n- Key stakeholders and recommended contacts\n- Talking points and strengths\n\nOUTPUT STRUCTURE:\n\n1. EXECUTIVE SUMMARY (2-3 sentences)\n   - Total companies analyzed\n   - Distribution of priority levels (HOT/WARM/MEDIUM/COLD)\n   - Key market trend observed\n\n2. TOP PRIORITY LEADS (HOT: 80-100 points)\n   For each HOT lead:\n   - Company name & total score\n   - Primary expansion signal (what triggered high score)\n   - Key stakeholder to contact\n   - Recommended action & timeline\n   - Top 2 talking points\n\n3. WARM LEADS PIPELINE (60-79 points)\n   Brief summary of each WARM lead:\n   - Company, score, primary signal\n   - Recommended contact (if available)\n\n4. STRATEGIC INSIGHTS\n   - Common expansion patterns across companies\n   - Market gaps or opportunities\n   - Recommended prioritization strategy\n\n5. NEXT STEPS\n   - Immediate actions for sales team\n   - Follow-up timeline recommendations\n\nFormat the report in clean markdown with headers, bullet points, and clear sections."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        2576,
+        48
+      ],
+      "id": "492e8853-53ba-44b7-94c6-cff383b6857c",
+      "name": "Report generator"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        2448,
+        256
+      ],
+      "id": "6d00533f-8697-4cda-98a4-adc43eee4a39",
+      "name": "OpenAI Chat Model4",
+      "credentials": {
+        "openAiApi": {
+          "id": "TidsRrv2fqQa3Bkz",
+          "name": "OpenAi account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "ajinkya.9289@gmail.com",
+        "subject": "=B2B Lead Analysis Report - {{ $now.format('MM-DD HH:mm') }}",
+        "message": "=<html>\n<head>\n<style>\n  body { font-family: Arial, sans-serif; line-height: 1.6; padding: 20px; }\n  pre { background: #f4f4f4; padding: 15px; border-radius: 5px; white-space: pre-wrap; }\n  h1 { color: #2563eb; }\n  h2 { color: #059669; border-bottom: 2px solid #e5e7eb; padding-bottom: 5px; margin-top: 30px; }\n  hr { margin: 30px 0; border: 1px solid #e5e7eb; }\n</style>\n</head>\n<body>\n<h1>📊 B2B Lead Analysis - Consolidated Report</h1>\n<p><strong>Generated:</strong> {{ $now.format('MMMM DD, YYYY [at] HH:mm') }}</p>\n<p><strong>Total Companies Analyzed:</strong> 8</p>\n\n<pre>{{ $json.consolidatedReport }}</pre>\n\n<hr>\n<p><small>Automatically generated by n8n B2B Lead Signal Analyzer</small></p>\n</body>\n</html>\n```\n\n---\n\n### **Step 3: Update the Subject (Optional but Recommended)**\n\nChange the Subject to:\n```\nB2B Lead Analysis - Consolidated Report (8 Companies) - {{ $now.format('YYYY-MM-DD') }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        3136,
+        48
+      ],
+      "id": "1aa1f8df-9321-4c07-b22d-a4edfb4da998",
+      "name": "Send a message",
+      "webhookId": "ed2fc541-ae33-4561-8b0c-6a0695ac7aa3",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "MQXWHZN53eT7i4iO",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get all items from Report generator\nconst allReports = $input.all();\n\n// Combine all reports into one\nlet consolidatedReport = `# B2B LEAD ANALYSIS - CONSOLIDATED REPORT\n## Generated: ${new Date().toLocaleString()}\n\n---\n\n`;\n\n// Add each company's report\nallReports.forEach((item, index) => {\n  consolidatedReport += `\n## COMPANY ${index + 1}\n\n${item.json.output}\n\n---\n\n`;\n});\n\n// Return single item with consolidated report\nreturn [{\n  json: {\n    consolidatedReport: consolidatedReport\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2928,
+        48
+      ],
+      "id": "365cc3e8-fd5a-46cb-bdc4-42b45b91d2b1",
+      "name": "Code in JavaScript2"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Search Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Search Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Search Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "tavilySearch": {
+      "ai_tool": [
+        [
+          {
+            "node": "Search Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Signal Extractor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Signal Extractor",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Signal Extractor": {
+      "main": [
+        [
+          {
+            "node": "PERSONA MAPPER",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Agent": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Scorer",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scorer": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PERSONA MAPPER": {
+      "main": [
+        [
+          {
+            "node": "Scorer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model3": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "PERSONA MAPPER",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Report generator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model4": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Report generator",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Report generator": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "b5218b83-c6d8-4cbb-b36f-473a9376c9be",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7efc68b3d9a2650d3e5b43fc7b323a6b2e47efe965c393f66713ea656a476150"
+  },
+  "id": "rLO2t6yzQO36oYvW",
+  "tags": []
+}
